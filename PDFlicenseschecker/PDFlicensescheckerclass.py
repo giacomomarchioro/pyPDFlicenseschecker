@@ -1,4 +1,4 @@
-from PyPDF2 import PdfReader
+import PyPDF2
 from PIL import Image, ExifTags
 import io
 import xml.etree.cElementTree as ET
@@ -30,6 +30,7 @@ class PDFLC():
         self.header = ["pagenumber", "image.name", "width", "height", "xmp",
                     "iptcrights", "creatorstxt", "exif", "exifrights", "exifartist"]
         self.saveimages = saveimages
+        self.imagesXMPXML = dict()
         self.readPDF(filename=filename)
 
 
@@ -51,74 +52,81 @@ class PDFLC():
         self.saveimages = True if saveimages else self.saveimages
         if self.saveimages and not os.path.exists(self.foldername):
             os.mkdir(self.foldername)
-        reader = PdfReader(filename)
+        reader = PyPDF2.PdfReader(filename)
         # read the metadata of the PDF file.
         meta = reader.metadata
         table = []
         for pagenum, page in enumerate(reader.pages, 1):
-            for image in page.images:
-                xmp = False
-                exif = False
-                iptcrights = None
-                exifrights = None
-                creators_txt = None
-                exifartist = None
-                creators_joined = None
-                # find the begining and the end of the xpacket.
-                begin = image.data.find(b"<?xpacket begin")
-                end = image.data.find(b"<?xpacket end")
-                if begin != -1 and end != -1:
-                    xmp = True
-                    # exctract the metadata
-                    metadata = image.data[begin:end]
-                    # create a DOM from the metadata string
-                    doc = ET.fromstring(metadata)
-                    # find the creator
-                    creators = doc.findall(
-                        './/{http://purl.org/dc/elements/1.1/}creator')
-                    creators_txt = []
-                    for i in creators:
-                        for k in i:
-                            # this in the case we have multiple creators
-                            if k.tag == "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Seq":
-                                for j in k:
-                                    creators_txt.append(j.text)
-                        else:
-                            creators_txt.append(i.text)
-                    creators_joined = ";".join(filter(None, creators_txt))
-                    rights = doc.findall(
-                        './/{http://purl.org/dc/elements/1.1/}rights')
-                    rights_txt = []
-                    for i in rights:
-                        for k in i:
-                            # in case we have multiple rights
-                            if k.tag == '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt':
-                                for j in k:
-                                    rights_txt.append(j.text)
-                        else:
-                            rights_txt.append(i.text)
-                    iptcrights = "".join(filter(None, rights_txt))
+            try:
+                for image in page.images:
+                    imageID = "-".join(map(str, (pagenum, image.name)))
+                    xmp = False
+                    exif = False
+                    iptcrights = None
+                    exifrights = None
+                    creators_txt = None
+                    exifartist = None
+                    creators_joined = None
+                    # find the begining and the end of the xpacket.
+                    begin = image.data.find(b"<?xpacket begin")
+                    end = image.data.find(b"<?xpacket end")
+                    if begin != -1 and end != -1:
+                        xmp = True
+                        # exctract the metadata
+                        metadata = image.data[begin:end]
+                        # create a DOM from the metadata string
+                        doc = ET.fromstring(metadata)
+                        self.imagesXMPXML[imageID] = doc
+                        # find the creator
+                        creators = doc.findall(
+                            './/{http://purl.org/dc/elements/1.1/}creator')
+                        creators_txt = []
+                        for i in creators:
+                            for k in i:
+                                # this in the case we have multiple creators
+                                if k.tag == "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Seq":
+                                    for j in k:
+                                        creators_txt.append(j.text)
+                            else:
+                                creators_txt.append(i.text)
+                        creators_joined = ";".join(filter(None, creators_txt))
+                        rights = doc.findall(
+                            './/{http://purl.org/dc/elements/1.1/}rights')
+                        rights_txt = []
+                        for i in rights:
+                            for k in i:
+                                # in case we have multiple rights
+                                if k.tag == '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt':
+                                    for j in k:
+                                        rights_txt.append(j.text)
+                            else:
+                                rights_txt.append(i.text)
+                        iptcrights = "".join(filter(None, rights_txt))
 
-                # the exif metadata is retrieved using PIL.
-                imagex = Image.open(io.BytesIO(image.data))
-                if self.saveimages:
-                    imagex.save(os.path.join(self.foldername,
-                                "-".join(map(str, (pagenum, image.name)))))
-                img_exif = imagex.getexif()
+                    # the exif metadata is retrieved using PIL.
+                    imagex = Image.open(io.BytesIO(image.data))
+                    if self.saveimages:
+                        imagex.save(os.path.join(self.foldername,imageID))
+                    img_exif = imagex.getexif()
 
-                if img_exif is not None:
-                    exif = True
-                    for key, val in img_exif.items():
-                        if key == 33432:  # rights
-                            exifrights = val
-                        if key == 315:  # artist
-                            exifartist = val
+                    if img_exif is not None:
+                        exif = True
+                        for key, val in img_exif.items():
+                            if key == 33432:  # rights
+                                exifrights = val
+                            if key == 315:  # artist
+                                exifartist = val
 
-                table.append([pagenum, image.name, imagex.width, imagex.height,
-                            xmp, iptcrights, creators_joined, exif, exifrights, exifartist])
-            self.imagesmetadata = table
-            self.PDFmetadata = meta
-            return table, meta
+                    table.append([pagenum, image.name, imagex.width, imagex.height,
+                                xmp, iptcrights, creators_joined, exif, exifrights, exifartist])
+            
+            except (PyPDF2.errors.PdfReadError,OSError):
+                print(f"Error in page {pagenum}")
+                table.append([pagenum, "n.a", "n.a", "n.a",
+                                "n.a", "n.a", "n.a", "n.a", "n.a", "n.a"])
+        self.imagesmetadata = table
+        self.PDFmetadata = meta
+        return table, meta
 
     def printImagesMetadata(self,**kwargs):
         """Print the relevant images metadata.
