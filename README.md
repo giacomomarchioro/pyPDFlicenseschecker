@@ -25,7 +25,7 @@ If the package has been install the `PDFlicenseschecker` can be used using the c
 
 Otherwise you can use `python -m PDFlicenseschecker.CLI ` instead. 
 
-The command line interface offer some options to export the data in a readable format.
+The command line interface offers some options to export the data in a readable format.
 
 ```bash
 usage: CLI.py [-h] [--html] [--csv] [--exportimages] [--silent] filename
@@ -46,7 +46,7 @@ optional arguments:
 
 ## Using the application programming interface (API)
 
-The software offer also an API for automating the process: 
+You can also import the package as a module: 
  
 ```python
 import PDFlicenseschecker
