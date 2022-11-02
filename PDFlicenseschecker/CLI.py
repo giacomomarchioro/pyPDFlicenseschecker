@@ -5,9 +5,12 @@ def RunCLI():
     description = """
     'This is the command line interface of PDFlicenseschecker.
     This software helps you to identify the licenses and the creators of a PDF
-    document and the images inside the document. 
-
-    PDFlicenseschecker mypdf.pdf
+    document and the images inside the document.
+     
+    Write PDFlicenseschecker followed by the name of the PDF file 
+    (e.g. PDFlicenseschecker mypdf.pdf) to extract the metadata use the flags
+    for exporting to different formats (e.g. PDFlicenseschecker mypdf.pdf --csv
+    --html)
 
     """
     parser = argparse.ArgumentParser(description=description)
@@ -16,21 +19,21 @@ def RunCLI():
     parser.add_argument('--html',
                         action='store_true',
                         required=False,
-                        help="saves an HTML report of the results.")
+                        help="save an HTML report of the results.")
     parser.add_argument('--csv',
                         action='store_true',
                         required=False,
-                        help="saves a CSV file containing the results of the images analysis.")
+                        help="save a CSV file containing the results of the images analysis.")
 
     parser.add_argument('--exportimages',
                         action='store_true',
                         required=False,
-                        help="saves all the images of the document to a folder.")
+                        help="save all the images of the document to a folder.")
 
     parser.add_argument('--silent',
                         action='store_true',
                         required=False,
-                        help="avoids printing to terminal the metadata.")
+                        help="avoid printing to terminal the metadata.")
 
     args = parser.parse_args()
     myAnalysis = PDFLC(filename=args.filename,saveimages=args.exportimages)
